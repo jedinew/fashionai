@@ -754,6 +754,9 @@ def render_about_page() -> None:
         2. Upload reference images in the Image Edit tab
         3. Generate designs and select your favorite result
         4. Refine or regenerate as needed
+
+        ---
+        **Created by Jedi Kim**
         """
     )
 
