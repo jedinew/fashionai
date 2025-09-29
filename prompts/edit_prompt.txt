@@ -1,0 +1,1 @@
+Create a 2D technical flat sketch showing the garment front and back side-by-side without overlap (front on the left half, back on the right half). Draw a black-and-white image using only lines and points. Exclude textures and any human face or body.

@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual env
+venv/
+.env/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Streamlit
+.streamlit/
+.streamlit/secrets.toml
+
+# Caches
+.cache/
+.pytest_cache/
+
+# IDEs/Editors
+.vscode/
+.idea/
+*.swp
+*.swo
