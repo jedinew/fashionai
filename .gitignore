@@ -27,3 +27,6 @@ venv/
 .idea/
 *.swp
 *.swo
+
+# Prompts
+prompts/
