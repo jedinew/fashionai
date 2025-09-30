@@ -1,1 +1,1 @@
-Create a 2D technical flat sketch of the front and back of the garment, ensuring they do not overlap and are scaled down. Exclude textures, faces, and bodies; use only lines and dots for a black and white image. Do not include hangers or accessories. Use black and white only, not color.
+Create a 2D flat sketch for garment production.

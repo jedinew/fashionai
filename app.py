@@ -395,6 +395,8 @@ def render_image_edit_page() -> None:
         st.session_state.selected_image_cache = None
     if "latest_results" not in st.session_state:
         st.session_state.latest_results = None
+    if "uploaded_files_cache" not in st.session_state:
+        st.session_state.uploaded_files_cache = None
 
     with st.expander("Prompt settings", expanded=True):
         st.caption("`prompts/edit_prompt.txt`")
@@ -439,21 +441,29 @@ def render_image_edit_page() -> None:
         type=["png", "jpg", "jpeg", "webp"],
         accept_multiple_files=True,
         help="You can upload multiple images for multi-reference editing.",
+        key="image_edit_uploader",
     )
 
+    # 파일 업로더 상태 캐싱
     if uploaded_files:
+        st.session_state.uploaded_files_cache = uploaded_files
+
+    # 캐시된 파일이 있으면 사용
+    files_to_use = uploaded_files if uploaded_files else st.session_state.uploaded_files_cache
+
+    if files_to_use:
         st.write("### Uploaded previews")
-        preview_cols = st.columns(min(len(uploaded_files), 3))
-        for file, col in zip(uploaded_files, preview_cols):
+        preview_cols = st.columns(min(len(files_to_use), 3))
+        for file, col in zip(files_to_use, preview_cols):
             with col:
                 st.image(file, caption=file.name, use_column_width=True)
 
-    generate_disabled = not uploaded_files
+    generate_disabled = not files_to_use
 
     results_to_render = st.session_state.get("latest_results")
 
     if st.button("Generate designs", type="primary", disabled=generate_disabled):
-        if not uploaded_files:
+        if not files_to_use:
             st.warning("Please upload at least one reference image.")
             return
 
@@ -461,7 +471,7 @@ def render_image_edit_page() -> None:
         st.info(prompt_text)
 
         with st.spinner("Submitting to fal.ai models..."):
-            image_urls = upload_images_to_fal(uploaded_files)
+            image_urls = upload_images_to_fal(files_to_use)
             if not image_urls:
                 st.error("Failed to upload images to fal.ai.")
                 return
