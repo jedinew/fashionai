@@ -265,26 +265,31 @@ def call_model(
     image_urls: List[str],
     mask_url: Optional[str] = None,
 ) -> Dict[str, Any]:
-    # Qwen 모델만 inpaint API 사용
-    if model["label"] == "Qwen Image Edit Plus" and mask_url:
-        return fal_client.run(
-            "fal-ai/qwen-image-edit/inpaint",
-            arguments={
-                "prompt": prompt,
-                "image_url": image_urls[0],
-                "mask_url": mask_url,
-                "num_images": 1,
-            },
-        )
-    else:
-        return fal_client.run(
-            model["endpoint"],
-            arguments={
-                "prompt": prompt,
-                "image_urls": image_urls,
-                "num_images": 1,
-            },
-        )
+    return fal_client.run(
+        model["endpoint"],
+        arguments={
+            "prompt": prompt,
+            "image_urls": image_urls,
+            "num_images": 1,
+        },
+    )
+
+
+def call_model_inpaint(
+    endpoint: str,
+    prompt: str,
+    image_url: str,
+    mask_url: str,
+) -> Dict[str, Any]:
+    return fal_client.run(
+        endpoint,
+        arguments={
+            "prompt": prompt,
+            "image_url": image_url,
+            "mask_url": mask_url,
+            "num_images": 1,
+        },
+    )
 
 
 def run_all_models(
@@ -639,17 +644,44 @@ def render_image_refine_page() -> None:
 
         try:
             with st.spinner("Running fal.ai refinement models..."):
-                # 기본 모델들은 overlay 이미지 사용, Qwen은 원본+마스크 사용
-                results = run_all_models(english_prompt, [overlay_url], mask_url=mask_url)
-                # Qwen에 원본 이미지 URL도 전달하도록 수정 필요
-                if "Qwen Image Edit Plus" in results:
-                    qwen_model = next(m for m in MODEL_ENDPOINTS if m["label"] == "Qwen Image Edit Plus")
-                    try:
-                        results["Qwen Image Edit Plus"] = call_model(
-                            qwen_model, english_prompt, [base_url], mask_url=mask_url
-                        )
-                    except Exception as exc:
-                        results["Qwen Image Edit Plus"] = {"error": str(exc)}
+                # Image Refinement 전용: Flux와 Qwen은 inpaint API로 원본+마스크 사용
+                results: Dict[str, Dict[str, Any]] = {}
+                with ThreadPoolExecutor(max_workers=4) as executor:
+                    future_to_label = {}
+
+                    for model in MODEL_ENDPOINTS:
+                        label = model["label"]
+                        if label == "Flux Pro Kontext Max Multi":
+                            # Flux LoRA Inpainting API 사용
+                            future = executor.submit(
+                                call_model_inpaint,
+                                "fal-ai/flux-lora/inpainting",
+                                english_prompt,
+                                base_url,
+                                mask_url
+                            )
+                            future_to_label[future] = label
+                        elif label == "Qwen Image Edit Plus":
+                            # Qwen Inpaint API 사용
+                            future = executor.submit(
+                                call_model_inpaint,
+                                "fal-ai/qwen-image-edit/inpaint",
+                                english_prompt,
+                                base_url,
+                                mask_url
+                            )
+                            future_to_label[future] = label
+                        else:
+                            # 나머지는 오버레이 이미지 사용
+                            future = executor.submit(call_model, model, english_prompt, [overlay_url])
+                            future_to_label[future] = label
+
+                    for future in as_completed(future_to_label):
+                        label = future_to_label[future]
+                        try:
+                            results[label] = future.result()
+                        except Exception as exc:
+                            results[label] = {"error": str(exc)}
         except Exception as exc:
             st.error(f"Generation failed: {exc}")
             return

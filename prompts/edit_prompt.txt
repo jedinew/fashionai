@@ -1,1 +1,1 @@
-Create a 2D flat sketch for garment production.
+Create a 2D flat sketch of the garment. Draw it with black lines, completely separating the front and back views.
