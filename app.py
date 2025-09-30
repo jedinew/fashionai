@@ -424,11 +424,11 @@ def render_image_edit_page() -> None:
         if st.button("Translate to English with GPT-5", type="primary"):
             try:
                 save_prompt_kr_text(st.session_state.prompt_text_kr)
-                with st.spinner("Translating via GPT-5..."):
+                with st.spinner("Translating via OpenAI..."):
                     translated = translate_korean_prompt(st.session_state.prompt_text_kr)
                 save_prompt_text(translated)
                 st.session_state.prompt_text_en = translated
-                st.success("Saved Korean prompt and updated English prompt from GPT-5 translation.")
+                st.rerun()
             except Exception as exc:
                 st.error(f"Translation failed: {exc}")
 
@@ -456,6 +456,9 @@ def render_image_edit_page() -> None:
         if not uploaded_files:
             st.warning("Please upload at least one reference image.")
             return
+
+        st.write("### 🎨 Generating with this prompt:")
+        st.info(prompt_text)
 
         with st.spinner("Submitting to fal.ai models..."):
             image_urls = upload_images_to_fal(uploaded_files)
@@ -612,6 +615,9 @@ def render_image_refine_page() -> None:
         base_image.save(base_buffer, format="PNG")
         base_bytes = base_buffer.getvalue()
 
+        st.write("### 🎨 Refining with this prompt:")
+        st.info(english_prompt)
+
         try:
             with st.spinner("Uploading images to fal.ai..."):
                 overlay_url = upload_bytes_to_fal(overlay_bytes, suffix=".png")
@@ -706,6 +712,9 @@ def render_prompt_regeneration_page() -> None:
         save_text_file(REGENERATE_PROMPT_KR_PATH, korean_prompt)
         save_text_file(REGENERATE_PROMPT_EN_PATH, english_prompt)
         st.session_state.regenerate_prompt_en = english_prompt
+
+        st.write("### 🎨 Regenerating with this prompt:")
+        st.info(english_prompt)
 
         try:
             with st.spinner("Uploading reference image to fal.ai..."):
