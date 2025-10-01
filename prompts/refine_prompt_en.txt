@@ -1,1 +1,1 @@
-Erase the marked line. Do not touch any other parts.
+Erase the indicated lines. Do not alter any other parts.

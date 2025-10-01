@@ -297,19 +297,42 @@ def run_all_models(
     image_urls: List[str],
     mask_url: Optional[str] = None,
 ) -> Dict[str, Dict[str, Any]]:
+    import logging
+    logger = logging.getLogger(__name__)
+
     results: Dict[str, Dict[str, Any]] = {model["label"]: {} for model in MODEL_ENDPOINTS}
+
+    # 로깅을 리스트에 수집 (thread-safe)
+    logs = []
+
     with ThreadPoolExecutor(max_workers=4) as executor:
-        future_to_model = {
-            executor.submit(call_model, model, prompt, image_urls, mask_url): model
-            for model in MODEL_ENDPOINTS
-        }
+        future_to_model = {}
+        for model in MODEL_ENDPOINTS:
+            label = model['label']
+            endpoint = model['endpoint']
+            logs.append(f"🔄 Submitting {label} to {endpoint}")
+            logger.info(f"Submitting {label} to {endpoint}")
+            future = executor.submit(call_model, model, prompt, image_urls, mask_url)
+            future_to_model[future] = model
+
         for future in as_completed(future_to_model):
             model = future_to_model[future]
             label = model["label"]
             try:
-                results[label] = future.result()
+                result = future.result(timeout=180)  # 3분 타임아웃
+                logs.append(f"✅ {label} completed")
+                logger.info(f"{label} completed")
+                results[label] = result
             except Exception as exc:
+                error_msg = f"❌ {label} failed: {exc}"
+                logs.append(error_msg)
+                logger.error(error_msg)
                 results[label] = {"error": str(exc)}
+
+    # with 블록 밖에서 안전하게 출력
+    for log in logs:
+        st.write(log)
+
     return results
 
 
@@ -400,8 +423,6 @@ def render_image_edit_page() -> None:
         st.session_state.selected_image_cache = None
     if "latest_results" not in st.session_state:
         st.session_state.latest_results = None
-    if "uploaded_files_cache" not in st.session_state:
-        st.session_state.uploaded_files_cache = None
 
     with st.expander("Prompt settings", expanded=True):
         st.caption("`prompts/edit_prompt.txt`")
@@ -449,12 +470,7 @@ def render_image_edit_page() -> None:
         key="image_edit_uploader",
     )
 
-    # 파일 업로더 상태 캐싱
-    if uploaded_files:
-        st.session_state.uploaded_files_cache = uploaded_files
-
-    # 캐시된 파일이 있으면 사용
-    files_to_use = uploaded_files if uploaded_files else st.session_state.uploaded_files_cache
+    files_to_use = uploaded_files
 
     if files_to_use:
         st.write("### Uploaded previews")
@@ -644,8 +660,13 @@ def render_image_refine_page() -> None:
 
         try:
             with st.spinner("Running fal.ai refinement models..."):
+                import logging
+                logger = logging.getLogger(__name__)
+
                 # Image Refinement 전용: Flux와 Qwen은 inpaint API로 원본+마스크 사용
                 results: Dict[str, Dict[str, Any]] = {}
+                logs = []  # thread-safe 로그 수집
+
                 with ThreadPoolExecutor(max_workers=4) as executor:
                     future_to_label = {}
 
@@ -653,6 +674,8 @@ def render_image_refine_page() -> None:
                         label = model["label"]
                         if label == "Flux Pro Kontext Max Multi":
                             # Flux LoRA Inpainting API 사용
+                            logs.append(f"🔄 Submitting {label} with inpaint API (base_url + mask_url)")
+                            logger.info(f"Submitting {label} with inpaint API")
                             future = executor.submit(
                                 call_model_inpaint,
                                 "fal-ai/flux-lora/inpainting",
@@ -663,6 +686,8 @@ def render_image_refine_page() -> None:
                             future_to_label[future] = label
                         elif label == "Qwen Image Edit Plus":
                             # Qwen Inpaint API 사용
+                            logs.append(f"🔄 Submitting {label} with inpaint API (base_url + mask_url)")
+                            logger.info(f"Submitting {label} with inpaint API")
                             future = executor.submit(
                                 call_model_inpaint,
                                 "fal-ai/qwen-image-edit/inpaint",
@@ -673,15 +698,28 @@ def render_image_refine_page() -> None:
                             future_to_label[future] = label
                         else:
                             # 나머지는 오버레이 이미지 사용
+                            logs.append(f"🔄 Submitting {label} with overlay image")
+                            logger.info(f"Submitting {label} with overlay image")
                             future = executor.submit(call_model, model, english_prompt, [overlay_url])
                             future_to_label[future] = label
 
                     for future in as_completed(future_to_label):
                         label = future_to_label[future]
                         try:
-                            results[label] = future.result()
+                            result = future.result(timeout=180)  # 3분 타임아웃
+                            logs.append(f"✅ {label} completed")
+                            logger.info(f"{label} completed")
+                            results[label] = result
                         except Exception as exc:
+                            error_msg = f"❌ {label} failed: {exc}"
+                            logs.append(error_msg)
+                            logger.error(error_msg)
                             results[label] = {"error": str(exc)}
+
+                # with 블록 밖에서 안전하게 출력
+                for log in logs:
+                    st.write(log)
+
         except Exception as exc:
             st.error(f"Generation failed: {exc}")
             return
