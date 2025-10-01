@@ -1,5 +1,6 @@
 import os
 import tempfile
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
 from pathlib import Path
@@ -12,6 +13,16 @@ import streamlit as st
 from openai import OpenAI
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
+
+# 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()  # 터미널 출력
+    ]
+)
+logger = logging.getLogger(__name__)
 
 
 st.set_page_config(
@@ -297,9 +308,6 @@ def run_all_models(
     image_urls: List[str],
     mask_url: Optional[str] = None,
 ) -> Dict[str, Dict[str, Any]]:
-    import logging
-    logger = logging.getLogger(__name__)
-
     results: Dict[str, Dict[str, Any]] = {model["label"]: {} for model in MODEL_ENDPOINTS}
 
     # 로깅을 리스트에 수집 (thread-safe)
@@ -660,9 +668,6 @@ def render_image_refine_page() -> None:
 
         try:
             with st.spinner("Running fal.ai refinement models..."):
-                import logging
-                logger = logging.getLogger(__name__)
-
                 # Image Refinement 전용: Flux와 Qwen은 inpaint API로 원본+마스크 사용
                 results: Dict[str, Dict[str, Any]] = {}
                 logs = []  # thread-safe 로그 수집
